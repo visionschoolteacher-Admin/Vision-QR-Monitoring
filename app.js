@@ -1,18 +1,28 @@
 // =========================================================
 // QR-MONITORING
 // VISION SCHOOL
-// APPLICATION FOUNDATION
+// STEP 3 — SUPABASE CONNECTION
 // =========================================================
 
 "use strict";
 
 
 // =========================================================
-// SUPABASE
+// SUPABASE CONFIGURATION
 // =========================================================
 
-// We will add the Supabase connection in the next step.
-// Keeping it out for now lets us test the UI first.
+// IMPORTANT:
+// Put your NEW QR-monitoring Supabase project details here.
+//
+// Use the Publishable key.
+// DO NOT use the service-role/secret key.
+
+const SUPABASE_URL =
+    "YOUR_SUPABASE_PROJECT_URL";
+
+const SUPABASE_PUBLISHABLE_KEY =
+    "YOUR_SUPABASE_PUBLISHABLE_KEY";
+
 
 let supabaseClient = null;
 
@@ -22,21 +32,27 @@ let supabaseClient = null;
 // =========================================================
 
 const appState = {
+
     currentPage: "dashboard",
+
     students: [],
+
     attendance: [],
+
     parents: [],
+
     scannerRunning: false
+
 };
 
 
 // =========================================================
-// DOM READY
+// START APPLICATION
 // =========================================================
 
 document.addEventListener(
     "DOMContentLoaded",
-    () => {
+    async () => {
 
         initializeNavigation();
 
@@ -52,11 +68,857 @@ document.addEventListener(
 
         showPage("dashboard");
 
-        console.log(
-            "QR Monitoring application started."
-        );
+        await initializeSupabase();
+
     }
 );
+
+
+// =========================================================
+// INITIALIZE SUPABASE
+// =========================================================
+
+async function initializeSupabase() {
+
+    const connectionDot =
+        document.getElementById(
+            "connectionDot"
+        );
+
+    const connectionText =
+        document.getElementById(
+            "connectionText"
+        );
+
+
+    try {
+
+        if (
+            !SUPABASE_URL ||
+            SUPABASE_URL ===
+                "YOUR_SUPABASE_PROJECT_URL"
+        ) {
+
+            throw new Error(
+                "Supabase URL has not been configured."
+            );
+
+        }
+
+
+        if (
+            !SUPABASE_PUBLISHABLE_KEY ||
+            SUPABASE_PUBLISHABLE_KEY ===
+                "YOUR_SUPABASE_PUBLISHABLE_KEY"
+        ) {
+
+            throw new Error(
+                "Supabase publishable key has not been configured."
+            );
+
+        }
+
+
+        if (
+            typeof window.supabase ===
+            "undefined"
+        ) {
+
+            throw new Error(
+                "Supabase library failed to load."
+            );
+
+        }
+
+
+        supabaseClient =
+            window.supabase.createClient(
+                SUPABASE_URL,
+                SUPABASE_PUBLISHABLE_KEY
+            );
+
+
+        // Test the connection.
+
+        const {
+            error
+        } =
+            await supabaseClient
+                .from("students")
+                .select("id")
+                .limit(1);
+
+
+        if (error) {
+
+            throw error;
+
+        }
+
+
+        setConnectionStatus(
+            true,
+            "Connected"
+        );
+
+
+        console.log(
+            "Supabase connection successful."
+        );
+
+
+        // Load initial data.
+
+        await loadStudents();
+
+        await loadTodayAttendance();
+
+
+    } catch (error) {
+
+        console.error(
+            "Supabase connection failed:",
+            error
+        );
+
+
+        setConnectionStatus(
+            false,
+            "Connection failed"
+        );
+
+
+        showToast(
+            "Supabase connection failed.",
+            "error"
+        );
+
+    }
+
+}
+
+
+// =========================================================
+// CONNECTION STATUS
+// =========================================================
+
+function setConnectionStatus(
+    connected,
+    text
+) {
+
+    const dot =
+        document.getElementById(
+            "connectionDot"
+        );
+
+    const label =
+        document.getElementById(
+            "connectionText"
+        );
+
+
+    if (!dot || !label) {
+        return;
+    }
+
+
+    dot.classList.remove(
+        "online",
+        "offline"
+    );
+
+
+    dot.classList.add(
+        connected
+            ? "online"
+            : "offline"
+    );
+
+
+    label.textContent =
+        text;
+
+}
+
+
+// =========================================================
+// LOAD STUDENTS
+// =========================================================
+
+async function loadStudents() {
+
+    if (!supabaseClient) {
+        return;
+    }
+
+
+    try {
+
+        const {
+            data,
+            error
+        } =
+            await supabaseClient
+                .from("students")
+                .select(
+                    "id,student_code,name,level,created_at"
+                )
+                .order(
+                    "name",
+                    {
+                        ascending: true
+                    }
+                );
+
+
+        if (error) {
+            throw error;
+        }
+
+
+        appState.students =
+            data || [];
+
+
+        renderStudents();
+
+        updateDashboard();
+
+
+        console.log(
+            "Students loaded:",
+            appState.students.length
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            "Failed to load students:",
+            error
+        );
+
+
+        showToast(
+            "Unable to load students.",
+            "error"
+        );
+
+    }
+
+}
+
+
+// =========================================================
+// LOAD TODAY'S ATTENDANCE
+// =========================================================
+
+async function loadTodayAttendance() {
+
+    if (!supabaseClient) {
+        return;
+    }
+
+
+    const today =
+        getTodayDate();
+
+
+    try {
+
+        const {
+            data,
+            error
+        } =
+            await supabaseClient
+                .from("attendance")
+                .select(
+                    "id,student_id,student_name,date,time_in,time_out,pickup_person,pickup_relationship,pickup_phone,pickup_option,approver,notes,created_at"
+                )
+                .eq(
+                    "date",
+                    today
+                )
+                .order(
+                    "created_at",
+                    {
+                        ascending: false
+                    }
+                );
+
+
+        if (error) {
+            throw error;
+        }
+
+
+        appState.attendance =
+            data || [];
+
+
+        renderAttendance();
+
+        updateDashboard();
+
+
+        console.log(
+            "Today's attendance loaded:",
+            appState.attendance.length
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            "Failed to load attendance:",
+            error
+        );
+
+
+        showToast(
+            "Unable to load attendance.",
+            "error"
+        );
+
+    }
+
+}
+
+
+// =========================================================
+// TODAY'S DATE
+// =========================================================
+
+function getTodayDate() {
+
+    return new Intl.DateTimeFormat(
+        "en-CA",
+        {
+            timeZone: "Asia/Vientiane"
+        }
+    ).format(
+        new Date()
+    );
+
+}
+
+
+// =========================================================
+// RENDER STUDENTS
+// =========================================================
+
+function renderStudents() {
+
+    const container =
+        document.getElementById(
+            "studentsTable"
+        );
+
+
+    if (!container) {
+        return;
+    }
+
+
+    if (
+        appState.students.length ===
+        0
+    ) {
+
+        container.innerHTML = `
+            <div class="empty-state">
+                No students found.
+            </div>
+        `;
+
+        populateLevelFilter();
+
+        return;
+    }
+
+
+    container.innerHTML = `
+        <table>
+
+            <thead>
+                <tr>
+                    <th>Student Code</th>
+                    <th>Name</th>
+                    <th>Level</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                ${
+                    appState.students
+                        .map(
+                            student => `
+                                <tr>
+
+                                    <td>
+                                        ${escapeHtml(
+                                            student.student_code
+                                        )}
+                                    </td>
+
+                                    <td>
+                                        ${escapeHtml(
+                                            student.name
+                                        )}
+                                    </td>
+
+                                    <td>
+                                        ${escapeHtml(
+                                            student.level ||
+                                            "-"
+                                        )}
+                                    </td>
+
+                                </tr>
+                            `
+                        )
+                        .join("")
+                }
+
+            </tbody>
+
+        </table>
+    `;
+
+
+    populateLevelFilter();
+
+}
+
+
+// =========================================================
+// LEVEL FILTER
+// =========================================================
+
+function populateLevelFilter() {
+
+    const select =
+        document.getElementById(
+            "levelFilter"
+        );
+
+
+    if (!select) {
+        return;
+    }
+
+
+    const currentValue =
+        select.value;
+
+
+    const levels =
+        [
+            ...new Set(
+                appState.students
+                    .map(
+                        student =>
+                            student.level
+                    )
+                    .filter(Boolean)
+            )
+        ]
+        .sort();
+
+
+    select.innerHTML = `
+        <option value="">
+            All Levels
+        </option>
+    `;
+
+
+    levels.forEach(
+        level => {
+
+            const option =
+                document.createElement(
+                    "option"
+                );
+
+            option.value =
+                level;
+
+            option.textContent =
+                level;
+
+            select.appendChild(
+                option
+            );
+
+        }
+    );
+
+
+    select.value =
+        currentValue;
+
+}
+
+
+// =========================================================
+// RENDER ATTENDANCE
+// =========================================================
+
+function renderAttendance() {
+
+    const container =
+        document.getElementById(
+            "attendanceTable"
+        );
+
+
+    if (!container) {
+        return;
+    }
+
+
+    if (
+        appState.attendance.length ===
+        0
+    ) {
+
+        container.innerHTML = `
+            <div class="empty-state">
+                No attendance records yet.
+            </div>
+        `;
+
+        return;
+    }
+
+
+    container.innerHTML = `
+        <table>
+
+            <thead>
+                <tr>
+                    <th>Student</th>
+                    <th>Time In</th>
+                    <th>Time Out</th>
+                    <th>Pickup Person</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                ${
+                    appState.attendance
+                        .map(
+                            record => `
+                                <tr>
+
+                                    <td>
+                                        ${escapeHtml(
+                                            record.student_name
+                                        )}
+                                    </td>
+
+                                    <td>
+                                        ${formatTime(
+                                            record.time_in
+                                        )}
+                                    </td>
+
+                                    <td>
+                                        ${formatTime(
+                                            record.time_out
+                                        )}
+                                    </td>
+
+                                    <td>
+                                        ${escapeHtml(
+                                            record.pickup_person ||
+                                            "-"
+                                        )}
+                                    </td>
+
+                                </tr>
+                            `
+                        )
+                        .join("")
+                }
+
+            </tbody>
+
+        </table>
+    `;
+
+}
+
+
+// =========================================================
+// DASHBOARD
+// =========================================================
+
+function updateDashboard() {
+
+    const totalStudents =
+        document.getElementById(
+            "totalStudents"
+        );
+
+    const todayTimeIn =
+        document.getElementById(
+            "todayTimeIn"
+        );
+
+    const todayPickedUp =
+        document.getElementById(
+            "todayPickedUp"
+        );
+
+    const stillAtSchool =
+        document.getElementById(
+            "stillAtSchool"
+        );
+
+
+    const timeInCount =
+        appState.attendance
+            .filter(
+                record =>
+                    Boolean(
+                        record.time_in
+                    )
+            )
+            .length;
+
+
+    const pickedUpCount =
+        appState.attendance
+            .filter(
+                record =>
+                    Boolean(
+                        record.time_out
+                    )
+            )
+            .length;
+
+
+    const stillCount =
+        Math.max(
+            0,
+            timeInCount -
+            pickedUpCount
+        );
+
+
+    if (totalStudents) {
+
+        totalStudents.textContent =
+            appState.students.length;
+
+    }
+
+
+    if (todayTimeIn) {
+
+        todayTimeIn.textContent =
+            timeInCount;
+
+    }
+
+
+    if (todayPickedUp) {
+
+        todayPickedUp.textContent =
+            pickedUpCount;
+
+    }
+
+
+    if (stillAtSchool) {
+
+        stillAtSchool.textContent =
+            stillCount;
+
+    }
+
+
+    renderDashboardAttendance();
+
+}
+
+
+// =========================================================
+// DASHBOARD ATTENDANCE
+// =========================================================
+
+function renderDashboardAttendance() {
+
+    const container =
+        document.getElementById(
+            "dashboardAttendance"
+        );
+
+
+    if (!container) {
+        return;
+    }
+
+
+    const records =
+        appState.attendance
+            .slice(
+                0,
+                10
+            );
+
+
+    if (
+        records.length ===
+        0
+    ) {
+
+        container.innerHTML = `
+            <div class="empty-state">
+                No attendance records yet.
+            </div>
+        `;
+
+        return;
+    }
+
+
+    container.innerHTML = `
+        <div class="table-container">
+
+            <table>
+
+                <thead>
+                    <tr>
+                        <th>Student</th>
+                        <th>Time In</th>
+                        <th>Time Out</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    ${
+                        records
+                            .map(
+                                record => `
+                                    <tr>
+
+                                        <td>
+                                            ${escapeHtml(
+                                                record.student_name
+                                            )}
+                                        </td>
+
+                                        <td>
+                                            ${formatTime(
+                                                record.time_in
+                                            )}
+                                        </td>
+
+                                        <td>
+                                            ${formatTime(
+                                                record.time_out
+                                            )}
+                                        </td>
+
+                                    </tr>
+                                `
+                            )
+                            .join("")
+                    }
+
+                </tbody>
+
+            </table>
+
+        </div>
+    `;
+
+}
+
+
+// =========================================================
+// FORMAT TIME
+// =========================================================
+
+function formatTime(
+    value
+) {
+
+    if (!value) {
+        return "-";
+    }
+
+
+    try {
+
+        return new Intl.DateTimeFormat(
+            "en-US",
+            {
+                timeZone:
+                    "Asia/Vientiane",
+
+                hour:
+                    "2-digit",
+
+                minute:
+                    "2-digit",
+
+                hour12:
+                    true
+            }
+        ).format(
+            new Date(value)
+        );
+
+    } catch {
+
+        return "-";
+
+    }
+
+}
+
+
+// =========================================================
+// ESCAPE HTML
+// =========================================================
+
+function escapeHtml(
+    value
+) {
+
+    return String(
+        value ?? ""
+    )
+    .replace(
+        /&/g,
+        "&amp;"
+    )
+    .replace(
+        /</g,
+        "&lt;"
+    )
+    .replace(
+        />/g,
+        "&gt;"
+    )
+    .replace(
+        /"/g,
+        "&quot;"
+    )
+    .replace(
+        /'/g,
+        "&#039;"
+    );
+
+}
 
 
 // =========================================================
@@ -70,6 +932,7 @@ function initializeNavigation() {
             ".nav-item"
         );
 
+
     navItems.forEach(
         button => {
 
@@ -77,46 +940,53 @@ function initializeNavigation() {
                 "click",
                 () => {
 
-                    const page =
-                        button.dataset.page;
+                    showPage(
+                        button.dataset.page
+                    );
 
-                    showPage(page);
 
-                    const sidebar =
-                        document.querySelector(
+                    document
+                        .querySelector(
                             ".sidebar"
+                        )
+                        ?.classList
+                        .remove(
+                            "open"
                         );
 
-                    sidebar.classList.remove(
-                        "open"
-                    );
                 }
             );
+
         }
     );
+
 }
 
 
-function showPage(pageName) {
+function showPage(
+    pageName
+) {
 
-    const pages =
-        document.querySelectorAll(
+    document
+        .querySelectorAll(
             ".page"
-        );
+        )
+        .forEach(
+            page => {
 
-    pages.forEach(
-        page => {
-            page.classList.remove(
-                "active"
-            );
-        }
-    );
+                page.classList.remove(
+                    "active"
+                );
+
+            }
+        );
 
 
     const selectedPage =
         document.getElementById(
             `page-${pageName}`
         );
+
 
     if (selectedPage) {
 
@@ -126,34 +996,50 @@ function showPage(pageName) {
 
         appState.currentPage =
             pageName;
+
     }
 
 
-    const navItems =
-        document.querySelectorAll(
+    document
+        .querySelectorAll(
             ".nav-item"
+        )
+        .forEach(
+            button => {
+
+                button.classList.toggle(
+                    "active",
+                    button.dataset.page ===
+                    pageName
+                );
+
+            }
         );
 
-    navItems.forEach(
-        button => {
 
-            button.classList.toggle(
-                "active",
-                button.dataset.page ===
-                pageName
-            );
-        }
-    );
+    const titles = {
 
+        dashboard:
+            "Dashboard",
 
-    const pageTitles = {
-        dashboard: "Dashboard",
-        students: "Students",
-        scanner: "QR Scanner",
-        attendance: "Attendance",
-        parents: "Parents / Guardians",
-        pickup: "Pickup",
-        reports: "Reports & Excel"
+        students:
+            "Students",
+
+        scanner:
+            "QR Scanner",
+
+        attendance:
+            "Attendance",
+
+        parents:
+            "Parents / Guardians",
+
+        pickup:
+            "Pickup",
+
+        reports:
+            "Reports & Excel"
+
     };
 
 
@@ -162,12 +1048,15 @@ function showPage(pageName) {
             "pageTitle"
         );
 
+
     if (title) {
 
         title.textContent =
-            pageTitles[pageName] ||
+            titles[pageName] ||
             "QR Monitoring";
+
     }
+
 }
 
 
@@ -187,9 +1076,11 @@ function initializeMobileMenu() {
             ".sidebar"
         );
 
+
     if (!button || !sidebar) {
         return;
     }
+
 
     button.addEventListener(
         "click",
@@ -198,39 +1089,53 @@ function initializeMobileMenu() {
             sidebar.classList.toggle(
                 "open"
             );
+
         }
     );
+
 }
 
 
 // =========================================================
-// DATE
+// DATE DISPLAY
 // =========================================================
 
 function initializeDate() {
 
-    const dateElement =
+    const element =
         document.getElementById(
             "currentDate"
         );
 
-    if (!dateElement) {
+
+    if (!element) {
         return;
     }
 
-    const now =
-        new Date();
 
-    dateElement.textContent =
-        now.toLocaleDateString(
+    element.textContent =
+        new Intl.DateTimeFormat(
             "en-US",
             {
-                weekday: "long",
-                year: "numeric",
-                month: "long",
-                day: "numeric"
+                timeZone:
+                    "Asia/Vientiane",
+
+                weekday:
+                    "long",
+
+                year:
+                    "numeric",
+
+                month:
+                    "long",
+
+                day:
+                    "numeric"
             }
+        ).format(
+            new Date()
         );
+
 }
 
 
@@ -251,14 +1156,13 @@ function initializeModals() {
                     "click",
                     () => {
 
-                        const modalId =
-                            button.dataset.close;
-
                         closeModal(
-                            modalId
+                            button.dataset.close
                         );
+
                     }
                 );
+
             }
         );
 
@@ -282,11 +1186,15 @@ function initializeModals() {
                             closeModal(
                                 modal.id
                             );
+
                         }
+
                     }
                 );
+
             }
         );
+
 }
 
 
@@ -301,6 +1209,7 @@ function initializeButtons() {
             "addStudentButton"
         );
 
+
     if (addStudentButton) {
 
         addStudentButton.addEventListener(
@@ -308,8 +1217,10 @@ function initializeButtons() {
             () => {
 
                 openStudentModal();
+
             }
         );
+
     }
 
 
@@ -318,17 +1229,24 @@ function initializeButtons() {
             "dashboardRefresh"
         );
 
+
     if (refreshDashboard) {
 
         refreshDashboard.addEventListener(
             "click",
-            () => {
+            async () => {
+
+                await loadStudents();
+
+                await loadTodayAttendance();
 
                 showToast(
-                    "Dashboard refresh will be connected to Supabase next."
+                    "Dashboard refreshed."
                 );
+
             }
         );
+
     }
 
 
@@ -337,17 +1255,22 @@ function initializeButtons() {
             "attendanceRefresh"
         );
 
+
     if (refreshAttendance) {
 
         refreshAttendance.addEventListener(
             "click",
-            () => {
+            async () => {
+
+                await loadTodayAttendance();
 
                 showToast(
-                    "Attendance refresh will be connected to Supabase next."
+                    "Attendance refreshed."
                 );
+
             }
         );
+
     }
 
 
@@ -356,35 +1279,20 @@ function initializeButtons() {
             "manualScanButton"
         );
 
+
     if (manualScanButton) {
 
         manualScanButton.addEventListener(
             "click",
             () => {
 
-                const input =
-                    document.getElementById(
-                        "manualStudentId"
-                    );
-
-                const value =
-                    input.value.trim();
-
-                if (!value) {
-
-                    showToast(
-                        "Enter a student code.",
-                        "error"
-                    );
-
-                    return;
-                }
-
                 showToast(
-                    `Student code received: ${value}`
+                    "Manual scanning will be connected in the scanner step."
                 );
+
             }
         );
+
     }
 
 
@@ -393,6 +1301,7 @@ function initializeButtons() {
             "startScanner"
         );
 
+
     if (startScanner) {
 
         startScanner.addEventListener(
@@ -400,10 +1309,12 @@ function initializeButtons() {
             () => {
 
                 showToast(
-                    "QR scanner will be connected in the scanner step."
+                    "QR scanner will be connected later."
                 );
+
             }
         );
+
     }
 
 
@@ -411,6 +1322,7 @@ function initializeButtons() {
         document.getElementById(
             "stopScanner"
         );
+
 
     if (stopScanner) {
 
@@ -421,9 +1333,12 @@ function initializeButtons() {
                 showToast(
                     "Scanner stopped."
                 );
+
             }
         );
+
     }
+
 }
 
 
@@ -438,48 +1353,64 @@ function openStudentModal() {
             "studentModal"
         );
 
+
     const title =
         document.getElementById(
             "studentModalTitle"
         );
+
 
     const form =
         document.getElementById(
             "studentForm"
         );
 
+
     if (!modal) {
         return;
     }
 
+
     if (title) {
+
         title.textContent =
             "Add Student";
+
     }
 
+
     if (form) {
+
         form.reset();
+
     }
+
 
     modal.classList.remove(
         "hidden"
     );
+
 }
 
 
-function closeModal(modalId) {
+function closeModal(
+    modalId
+) {
 
     const modal =
         document.getElementById(
             modalId
         );
 
+
     if (modal) {
 
         modal.classList.add(
             "hidden"
         );
+
     }
+
 }
 
 
@@ -489,17 +1420,19 @@ function closeModal(modalId) {
 
 function initializeReports() {
 
-    const monthly =
+    const select =
         document.getElementById(
             "monthlyReport"
         );
 
-    if (!monthly) {
+
+    if (!select) {
         return;
     }
 
 
     const months = [
+
         "August",
         "September",
         "October",
@@ -510,6 +1443,7 @@ function initializeReports() {
         "March",
         "April",
         "May"
+
     ];
 
 
@@ -527,11 +1461,13 @@ function initializeReports() {
             option.textContent =
                 month;
 
-            monthly.appendChild(
+            select.appendChild(
                 option
             );
+
         }
     );
+
 }
 
 
@@ -551,6 +1487,7 @@ function showToast(
         document.getElementById(
             "toast"
         );
+
 
     if (!toast) {
         return;
@@ -586,6 +1523,7 @@ function showToast(
             },
             2500
         );
+
 }
 
 
@@ -595,14 +1533,21 @@ function showToast(
 
 window.QRMonitoring = {
 
-    state: appState,
+    state:
+        appState,
+
+    supabase:
+        () =>
+            supabaseClient,
+
+    reloadStudents:
+        loadStudents,
+
+    reloadAttendance:
+        loadTodayAttendance,
 
     showPage,
 
-    showToast,
-
-    openStudentModal,
-
-    closeModal
+    showToast
 
 };

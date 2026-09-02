@@ -1,3 +1,4 @@
+```javascript
 // =========================================================
 // QR-MONITORING
 // VISION SCHOOL
@@ -11,11 +12,7 @@
 // SUPABASE CONFIGURATION
 // =========================================================
 
-// IMPORTANT:
-// Put your NEW QR-monitoring Supabase project details here.
-//
-// Use the Publishable key.
-// DO NOT use the service-role/secret key.
+// NEW QR-monitoring Supabase project
 
 const SUPABASE_URL =
     "https://lqehcnfuliuqgnleqdty.supabase.co";
@@ -23,11 +20,7 @@ const SUPABASE_URL =
 const SUPABASE_PUBLISHABLE_KEY =
     "sb_publishable_mYL351QM96B6ouODCL8Q9A_df0xTnpM";
 
-const supabaseClient = window.supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_PUBLISHABLE_KEY
-);
-
+// Supabase client will be created inside initializeSupabase()
 let supabaseClient = null;
 
 
@@ -94,7 +87,6 @@ async function initializeSupabase() {
             "connectionText"
         );
 
-
     try {
 
         if (
@@ -135,6 +127,8 @@ async function initializeSupabase() {
         }
 
 
+        // Create Supabase client
+
         supabaseClient =
             window.supabase.createClient(
                 SUPABASE_URL,
@@ -142,7 +136,7 @@ async function initializeSupabase() {
             );
 
 
-        // Test the connection.
+        // Test Supabase connection
 
         const {
             error
@@ -171,7 +165,7 @@ async function initializeSupabase() {
         );
 
 
-        // Load initial data.
+        // Load initial data
 
         await loadStudents();
 
@@ -1555,3 +1549,4 @@ window.QRMonitoring = {
     showToast
 
 };
+```

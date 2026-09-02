@@ -18,7 +18,7 @@
 // DO NOT use the service-role/secret key.
 
 const SUPABASE_URL =
-    "https://xxxxxxxxxxxxxxxx.supabase.co";
+    "https://sb_publishable_mYL351QM96B6ouODCL8Q9A_df0xTnpM";
 
 const SUPABASE_PUBLISHABLE_KEY =
     "sb_publishable_xxxxxxxxxxxxxxxxx";

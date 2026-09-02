@@ -18,10 +18,10 @@
 // DO NOT use the service-role/secret key.
 
 const SUPABASE_URL =
-    "YOUR_SUPABASE_PROJECT_URL";
+    "https://xxxxxxxxxxxxxxxx.supabase.co";
 
 const SUPABASE_PUBLISHABLE_KEY =
-    "YOUR_SUPABASE_PUBLISHABLE_KEY";
+    "sb_publishable_xxxxxxxxxxxxxxxxx";
 
 
 let supabaseClient = null;
